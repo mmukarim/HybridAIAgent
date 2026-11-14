@@ -1,0 +1,55 @@
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+.AppleDouble/
+.LSOverride/
+._*
+.Spotlight-V100
+.Trashes/
+
+# Logs and temp files
+*.log
+*.tmp
+tmp/
+temp/
+
+# Local runtime artifacts
+.coverage
+htmlcov/
+build/
+dist/
+.coverage.*
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Optional: project-specific local data
+local/
+cache/
