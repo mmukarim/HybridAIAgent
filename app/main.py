@@ -136,7 +136,17 @@ def run_langgraph_agent(graph):
             )
 
             response = result["messages"][-1]
-            print("\nAgent:", response.content)
+
+            if isinstance(response.content, str):
+                response_text = response.content
+            else:
+                response_text = "\n".join(
+                    block["text"]
+                    for block in response.content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                )
+
+            print("\nAgent:", response_text)
 
         except Exception as exc:
             print(f"\nAgent error: {exc}")

@@ -45,17 +45,17 @@ class AgentExecutor:
 
             # 5. Execute all requested tools
             for step in function_calls:
-                print(f"[TOOL CALL] {step.name}")
-                print(f"[TOOL ARGUMENTS] {step.arguments}")
+                # print(f"[TOOL CALL] {step.name}")
+                # print(f"[TOOL ARGUMENTS] {step.arguments}")
                 try:
                     result = self.tool_registry.execute(
                         step.name,
                         step.arguments,
                     )
-                    print(f"[TOOL RESULT] {result}")
+                    # print(f"[TOOL RESULT] {result}")
 
                 except Exception as exc:
-                    print(f"[TOOL ERROR] {exc}")
+                    # print(f"[TOOL ERROR] {exc}")
                     result = {
                         "error": str(exc)
                     }

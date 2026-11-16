@@ -92,6 +92,76 @@ _AGGREGATE_DATA = {
     "additionalProperties": False
 }
 
+_GENERATE_CHART = {
+    "type": "object",
+    "properties": {
+        "dataset_id": _DATASET_ID,
+        "chart_type": {
+            "type": "string",
+            "enum": ["bar", "line", "scatter", "histogram"],
+            "description": "Type of chart to generate."
+        },
+        "x_column": {
+            "type": "string",
+            "description": "Column used for the x-axis, or the numeric column for a histogram."
+        },
+        "y_column": {
+            "type": "string",
+            "description": "Numeric column used for the y-axis. Not required for histograms."
+        },
+        "title": {
+            "type": "string",
+            "description": "Optional chart title."
+        }
+    },
+    "required": ["dataset_id", "chart_type", "x_column"],
+    "additionalProperties": False
+}
+
+_GENERATE_BUSINESS_INSIGHTS = {
+    "type": "object",
+    "properties": {
+        "dataset_id": _DATASET_ID,
+        "group_by": {
+            "type": "string",
+            "description": "Column used to group the dataset."
+        },
+        "value_column": {
+            "type": "string",
+            "description": "Numeric column used for business analysis."
+        },
+        "operation": {
+            "type": "string",
+            "enum": ["sum", "mean", "median", "min", "max"],
+            "description": "Aggregation operation."
+        }
+    },
+    "required": ["dataset_id", "group_by", "value_column"],
+    "additionalProperties": False
+}
+
+_GENERATE_BUSINESS_REPORT = {
+    "type": "object",
+    "properties": {
+        "dataset_id": _DATASET_ID,
+        "group_by": {
+            "type": "string",
+            "description": "Column used to group the dataset."
+        },
+        "value_column": {
+            "type": "string",
+            "description": "Numeric column used for business analysis."
+        },
+        "operation": {
+            "type": "string",
+            "enum": ["sum", "mean", "median", "min", "max"],
+            "description": "Aggregation operation."
+        }
+    },
+    "required": ["dataset_id", "group_by", "value_column"],
+    "additionalProperties": False
+}
+
 TOOL_SCHEMAS = [
     {
         "type": "function",
@@ -149,5 +219,30 @@ TOOL_SCHEMAS = [
         "name": "aggregate_data",
         "description": "Group a registered dataset by a column and aggregate another column using sum, mean, median, min, max, or count.",
         "parameters": _AGGREGATE_DATA
-    }
+    },
+    {
+        "type": "function",
+        "name": "generate_chart",
+        "description": "Generate a bar chart, line chart, scatter plot, or histogram from a registered dataset. Returns the saved chart image path.",
+        "parameters": _GENERATE_CHART
+    },
+    {
+        "type": "function",
+        "name": "generate_business_insights",
+        "description": (
+            "Generates deterministic business insights from a registered "
+            "dataset, identifying highest and lowest performing groups "
+            "and contribution percentages."
+        ),
+            "parameters": _GENERATE_BUSINESS_INSIGHTS
+    },
+    {
+        "type": "function",
+        "name": "generate_business_report",
+        "description": (
+            "Generates a complete business report using deterministic "
+            "Python analysis and Gemini interpretation."
+        ),
+        "parameters": _GENERATE_BUSINESS_REPORT
+    },
 ]

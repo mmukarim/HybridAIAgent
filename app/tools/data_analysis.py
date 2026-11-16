@@ -1,4 +1,9 @@
+from pathlib import Path
+from uuid import uuid4
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import math
 import pandas as pd
 import numpy as np
@@ -348,3 +353,234 @@ def aggregate_registered_data(
 ) -> dict:
     df = registry.get(dataset_id)
     return aggregate_data(df, group_by, value_column, operation)
+
+
+def generate_chart(
+    df: pd.DataFrame,
+    chart_type: str,
+    x_column: str,
+    y_column: str = None,
+    title: str = None,
+) -> dict:
+    """
+    Generate a chart from a Pandas DataFrame and save it as a PNG file.
+
+    Supported chart types:
+        - bar
+        - line
+        - scatter
+        - histogram
+    """
+
+    supported_types = {"bar", "line", "scatter", "histogram"}
+
+    # 1. Validate the dataset
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a Pandas DataFrame.")
+
+    if df.empty:
+        raise ValueError("Cannot generate a chart from an empty dataset.")
+
+    # 2. Validate chart type
+    if chart_type not in supported_types:
+        raise ValueError(
+            f"Unsupported chart type '{chart_type}'. "
+            f"Supported types: {sorted(supported_types)}"
+        )
+
+    # 3. Validate x-axis column
+    if x_column not in df.columns:
+        raise ValueError(f"Column '{x_column}' not found in dataset.")
+
+    # 4. Validate data required for the selected chart
+    if chart_type == "histogram":
+        if not pd.api.types.is_numeric_dtype(df[x_column]):
+            raise ValueError(
+                "Histogram requires a numeric column."
+            )
+
+        plot_df = df[x_column].dropna()
+
+        if plot_df.empty:
+            raise ValueError("No valid data available for the histogram.")
+
+    else:
+        if not y_column:
+            raise ValueError(
+                f"Chart type '{chart_type}' requires a y_column."
+            )
+
+        if y_column not in df.columns:
+            raise ValueError(f"Column '{y_column}' not found in dataset.")
+
+        if not pd.api.types.is_numeric_dtype(df[y_column]):
+            raise ValueError(
+                "The y-axis column must contain numeric values."
+            )
+
+        if chart_type == "scatter" and not pd.api.types.is_numeric_dtype(
+            df[x_column]
+        ):
+            raise ValueError(
+                "Scatter plots require a numeric x-axis column."
+            )
+
+        plot_df = df[[x_column, y_column]].dropna()
+
+        if plot_df.empty:
+            raise ValueError("No valid data available for the chart.")
+
+    # 5. Create the chart
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    try:
+        if chart_type == "histogram":
+            plot_df.plot(
+                kind="hist",
+                bins=20,
+                ax=ax,
+                edgecolor="black",
+            )
+            ax.set_xlabel(x_column)
+            ax.set_ylabel("Frequency")
+
+        else:
+            plot_df.plot(
+                kind=chart_type,
+                x=x_column,
+                y=y_column,
+                ax=ax,
+            )
+
+            ax.set_xlabel(x_column)
+            ax.set_ylabel(y_column)
+
+        chart_title = title or f"{chart_type.title()} Chart"
+
+        ax.set_title(chart_title)
+        fig.tight_layout()
+
+        # 6. Save the chart in the project root
+        output_path = (
+            Path(__file__).resolve().parents[2]
+            / f"chart_{uuid4().hex[:10]}.png"
+        )
+
+        fig.savefig(output_path, dpi=150, bbox_inches="tight")
+
+        return {
+            "status": "success",
+            "chart_type": chart_type,
+            "title": chart_title,
+            "chart_path": str(output_path),
+        }
+
+    finally:
+        plt.close(fig)
+
+
+def generate_registered_chart(
+    registry: DatasetRegistry,
+    dataset_id: str,
+    chart_type: str,
+    x_column: str,
+    y_column: str = None,
+    title: str = None,
+) -> dict:
+    """
+    Generate a chart from a registered dataset.
+    """
+
+    df = registry.get(dataset_id)
+
+    return generate_chart(
+        df=df,
+        chart_type=chart_type,
+        x_column=x_column,
+        y_column=y_column,
+        title=title,
+    )
+
+
+
+def generate_business_insights(
+    df: pd.DataFrame,
+    group_by: str,
+    value_column: str,
+    operation: str = "sum",
+) -> dict:
+    """
+    Generate deterministic business insights from grouped data.
+    """
+
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a Pandas DataFrame.")
+
+    if df.empty:
+        raise ValueError("Cannot generate insights from an empty dataset.")
+
+    if operation not in {"sum", "mean", "median", "min", "max"}:
+        raise ValueError(
+            "Operation must be sum, mean, median, min, or max."
+        )
+
+    aggregation = aggregate_data(
+        df=df,
+        group_by=group_by,
+        value_column=value_column,
+        operation=operation,
+    )
+
+    group_insights = aggregation["results"]
+
+    if not group_insights:
+        raise ValueError("No valid groups found for analysis.")
+
+    values = [item["value"] for item in group_insights]
+
+    if operation == "sum":
+        total = sum(values)
+
+        if total == 0:
+            raise ValueError(
+                "Cannot calculate contribution percentages "
+                "when the total is zero."
+            )
+
+        for item in group_insights:
+            item["contribution_percentage"] = round(
+                (item["value"] / total) * 100, 2
+            )
+    else:
+        total = None
+
+    highest_group = max(group_insights, key=lambda item: item["value"])
+    lowest_group = min(group_insights, key=lambda item: item["value"])
+
+    return {
+        "group_by": group_by,
+        "value_column": value_column,
+        "operation": operation,
+        "total": _to_native(total),
+        "group_count": len(group_insights),
+        "highest_performing_group": highest_group,
+        "lowest_performing_group": lowest_group,
+        "group_insights": group_insights,
+    }
+
+
+def generate_registered_business_insights(
+    registry: DatasetRegistry,
+    dataset_id: str,
+    group_by: str,
+    value_column: str,
+    operation: str = "sum",
+) -> dict:
+    df = registry.get(dataset_id)
+
+    return generate_business_insights(
+        df=df,
+        group_by=group_by,
+        value_column=value_column,
+        operation=operation,
+    )

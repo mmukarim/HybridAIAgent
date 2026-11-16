@@ -1,6 +1,6 @@
-
 from functools import partial
 
+from app.agent.reporting import generate_business_report
 from app.tools.registry import ToolRegistry
 from app.tools.calculator import (
     add_numbers,
@@ -13,7 +13,9 @@ from app.tools.data_analysis import (
     profile_registered_dataset,
     analyze_registered_column,
     analyze_registered_correlations,
-    aggregate_registered_data
+    aggregate_registered_data,
+    generate_registered_chart,
+    generate_registered_business_insights
 )
 
 
@@ -65,6 +67,30 @@ def build_tool_registry(dataset_registry=None) -> ToolRegistry:
             partial(
                 aggregate_registered_data,
                 registry=dataset_registry
+            )
+        )
+
+        tool_registry.register(
+            "generate_chart",
+            partial(
+                generate_registered_chart,
+                registry=dataset_registry
+            )
+        )
+        
+        tool_registry.register(
+            "generate_business_insights",
+            partial(
+                generate_registered_business_insights,
+                registry=dataset_registry
+            )
+        )
+
+        tool_registry.register(
+            "generate_business_report",
+            partial(
+                generate_business_report,
+                registry=dataset_registry,
             )
         )
 
