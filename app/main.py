@@ -1,183 +1,76 @@
+import os
+from contextlib import asynccontextmanager
 
-from uuid import uuid4
+from fastapi import FastAPI
 
-from langchain_core.messages import HumanMessage
-
-from app.llm.factory import LLMFactory
-from app.agent.executor import AgentExecutor
-
-from app.tools.registration import build_tool_registry
-from app.tools.schemas import TOOL_SCHEMAS
+from app.config import settings
+from app.api.routes import conversation_router, message_router, file_router
+from app.database import DatabaseManager, CheckpointerManager
+from app.storage.local import LocalStorage
 from app.tools.dataset_registry import DatasetRegistry
-from app.tools.data_loader import load_dataset
-
 from app.langchain_integration.agent import build_agent
 
 
-def select_agent() -> str:
-    """Ask the user to select an agent."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    database_url = settings.DATABASE_URL
 
-    print("\nSelect an agent:")
-    print("1. Custom Agent")
-    print("2. LangGraph Agent")
-
-    while True:
-        choice = input("\nEnter your choice (1/2): ").strip()
-
-        if choice == "1":
-            return "custom"
-
-        if choice == "2":
-            return "langgraph"
-
-        print("Invalid choice. Please enter 1 or 2.")
-
-
-def initialize_dataset(dataset_registry: DatasetRegistry):
-    """Optionally load and register a dataset."""
-
-    file_path = input(
-        "\nEnter dataset file path (press Enter to skip): "
-    ).strip()
-
-    if not file_path:
-        print("No dataset loaded.")
-        return
+    database = DatabaseManager(database_url)
+    checkpointer_manager = CheckpointerManager(database_url)
 
     try:
-        df, metadata = load_dataset(file_path)
+        # Initialize application database pool
+        await database.open()
 
-        dataset_id = dataset_registry.register(df, metadata)
+        # Initialize PostgreSQL checkpointer
+        checkpointer = await checkpointer_manager.open()
 
-        print("\nDataset loaded successfully.")
-        print(f"Dataset ID: {dataset_id}")
-        print(f"File: {metadata['file_name']}")
-        print(f"Rows: {metadata['row_count']}")
-        print(f"Columns: {metadata['column_count']}")
+        # Initialize shared dataset registry
+        dataset_registry = DatasetRegistry()
 
-    except Exception as exc:
-        print(f"\nDataset loading failed: {exc}")
+        # Build LangGraph agent with persistent checkpointing
+        agent = build_agent(
+            dataset_registry=dataset_registry,
+            checkpointer=checkpointer,
+        )
 
+        storage = LocalStorage(settings.FILE_STORAGE_PATH)
 
-def initialize_custom_agent(dataset_registry: DatasetRegistry):
-    """Initialize the custom Gemini agent."""
+        # Expose resources to API routes
+        agent_app.state.database = database
+        agent_app.state.checkpointer_manager = checkpointer_manager
+        agent_app.state.dataset_registry = dataset_registry
+        agent_app.state.agent = agent
+        agent_app.state.storage = storage
 
-    gemini = LLMFactory.create("gemini")
+        print("Application startup completed.")
 
-    tool_registry = build_tool_registry(dataset_registry)
+        yield
 
-    return AgentExecutor(
-        gemini=gemini,
-        tool_registry=tool_registry,
-        tool_schemas=TOOL_SCHEMAS,
-    )
+    finally:
+        # Release resources
+        await checkpointer_manager.close()
+        await database.close()
 
-
-def initialize_langgraph_agent(dataset_registry: DatasetRegistry):
-    """Initialize the LangGraph agent."""
-
-    return build_agent(dataset_registry)
-
-
-def run_custom_agent(agent):
-    """Run an interactive custom-agent session."""
-
-    print("\nCustom Agent is ready.")
-    print("Type 'exit' or 'quit' to end the session.")
-
-    while True:
-        user_input = input("\nUser: ").strip()
-
-        if user_input.lower() in ("exit", "quit"):
-            break
-
-        if not user_input:
-            continue
-
-        try:
-            response = agent.run(user_input)
-            print("\nAgent:", response)
-
-        except Exception as exc:
-            print(f"\nAgent error: {exc}")
+        print("Application shutdown completed.")
 
 
-def run_langgraph_agent(graph):
-    """Run an interactive LangGraph session."""
+agent_app = FastAPI(
+    title="Hybrid AI Agent API",
+    description="API for the Hybrid AI Data Analyst Agent",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
-    print("\nLangGraph Agent is ready.")
-    print("Type 'exit' or 'quit' to end the session.")
 
-    # A unique thread ID maintains conversation state
-    # for this session through InMemorySaver.
-    config = {
-        "configurable": {
-            "thread_id": str(uuid4())
-        }
+@agent_app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "application": "Hybrid AI Agent",
     }
 
-    while True:
-        user_input = input("\nUser: ").strip()
-
-        if user_input.lower() in ("exit", "quit"):
-            break
-
-        if not user_input:
-            continue
-
-        try:
-            result = graph.invoke(
-                {
-                    "messages": [
-                        HumanMessage(content=user_input)
-                    ]
-                },
-                config=config,
-            )
-
-            response = result["messages"][-1]
-
-            if isinstance(response.content, str):
-                response_text = response.content
-            else:
-                response_text = "\n".join(
-                    block["text"]
-                    for block in response.content
-                    if isinstance(block, dict) and block.get("type") == "text"
-                )
-
-            print("\nAgent:", response_text)
-
-        except Exception as exc:
-            print(f"\nAgent error: {exc}")
-
-
-def main():
-
-    print("=" * 50)
-    print("       HYBRID AI AGENT")
-    print("=" * 50)
-
-    # 1. Select the agent
-    agent_type = select_agent()
-
-    # 2. Create one shared dataset registry
-    dataset_registry = DatasetRegistry()
-
-    # 3. Optionally load a dataset
-    initialize_dataset(dataset_registry)
-
-    # 4. Initialize the selected agent
-    if agent_type == "custom":
-        agent = initialize_custom_agent(dataset_registry)
-        run_custom_agent(agent)
-
-    else:
-        graph = initialize_langgraph_agent(dataset_registry)
-        run_langgraph_agent(graph)
-
-    print("\nAgent session ended.")
-
-
-if __name__ == "__main__":
-    main()
+# version 1 API routes
+agent_app.include_router(conversation_router, prefix="/api/v1")
+agent_app.include_router(message_router, prefix="/api/v1")
+agent_app.include_router(file_router, prefix="/api/v1")

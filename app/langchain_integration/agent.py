@@ -15,7 +15,7 @@ from app.langchain_integration.tools import (
 from app.tools.dataset_registry import DatasetRegistry
 
 
-def build_agent(dataset_registry: DatasetRegistry):
+def build_agent(dataset_registry: DatasetRegistry, checkpointer=None):
 
     # 1. Initialize the chat model
     chat_model = GeminiChatModel()
@@ -52,7 +52,12 @@ def build_agent(dataset_registry: DatasetRegistry):
     builder.add_edge("tools", "llm")
 
     # 7. Compile with checkpointing
-    memory = InMemorySaver()
-    graph = builder.compile(checkpointer=memory)
+    graph = builder.compile(
+        checkpointer=(
+            checkpointer
+            if checkpointer is not None
+            else InMemorySaver()
+        )
+    )
 
     return graph
