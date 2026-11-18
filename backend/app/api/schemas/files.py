@@ -21,3 +21,14 @@ class FileListResponse(BaseModel):
 
     files: list[FileResponse]
     total: int
+
+
+class DatasetLoadResponse(BaseModel):
+    """Response schema for a loaded dataset."""
+
+    dataset_id: str
+    filename: str
+    rows: int
+    columns: int
+    column_names: list[str]
+    file_size: int

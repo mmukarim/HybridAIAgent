@@ -7,6 +7,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from app.services.conversation_service import ConversationService
 from app.services.agent_service import AgentService
 from app.services.file_service import FileService
+from app.services.dataset_service import DatasetService
 
 
 async def get_database_session(request: Request):
@@ -38,23 +39,6 @@ async def get_conversation_service(
     )
 
 
-
-async def get_agent_service(
-    conversation_service: Annotated[
-        ConversationService,
-        Depends(get_conversation_service),
-    ],
-    request: Request,
-) -> AgentService:
-    """Provide an agent service for the current API request."""
-
-    agent = request.app.state.agent
-
-    return AgentService(
-        conversation_service=conversation_service,
-        agent=agent,
-    )
-
 def get_file_service(
     session: Annotated[
         AsyncSession,
@@ -67,4 +51,37 @@ def get_file_service(
     return FileService(
         session=session,
         storage=storage,
+    )
+
+
+def get_dataset_service(
+    session: Annotated[AsyncSession, Depends(get_database_session)],
+    request: Request,
+) -> DatasetService:
+    return DatasetService(
+        session=session,
+        storage=request.app.state.storage,
+        dataset_registry=request.app.state.dataset_registry,
+    )
+
+
+async def get_agent_service(
+    conversation_service: Annotated[
+        ConversationService,
+        Depends(get_conversation_service),
+    ],
+    dataset_service: Annotated[
+        DatasetService,
+        Depends(get_dataset_service),
+    ],
+    request: Request,
+) -> AgentService:
+    """Provide an agent service for the current API request."""
+
+    agent = request.app.state.agent
+
+    return AgentService(
+        conversation_service=conversation_service,
+        agent=agent,
+        dataset_service=dataset_service,
     )

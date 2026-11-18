@@ -2,6 +2,7 @@ from app.api.schemas.conversations import (
     ConversationCreate,
     ConversationListResponse,
     ConversationResponse,
+    ConversationDatasetUpdate,
 )
 
 from app.api.schemas.messages import (
@@ -18,6 +19,7 @@ __all__ = [
     "ConversationCreate",
     "ConversationListResponse",
     "ConversationResponse",
+    "ConversationDatasetUpdate",
     "MessageCreate",
     "MessageResponse",
     "FileResponse",

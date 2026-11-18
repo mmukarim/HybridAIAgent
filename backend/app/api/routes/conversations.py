@@ -8,6 +8,7 @@ from app.api.schemas import (
     ConversationCreate,
     ConversationListResponse,
     ConversationResponse,
+    ConversationDatasetUpdate,
 )
 from app.services.conversation_service import ConversationService
 
@@ -94,3 +95,54 @@ async def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found.",
         )
+
+
+@conversation_router.put(
+    "/{conversation_id}/dataset",
+    response_model=ConversationResponse,
+)
+async def set_conversation_dataset(
+    conversation_id: uuid.UUID,
+    payload: ConversationDatasetUpdate,
+    conversation_service: Annotated[
+        ConversationService, Depends(get_conversation_service)
+    ],
+):
+    try:
+        conversation = await conversation_service.set_dataset(
+            conversation_id=conversation_id,
+            file_id=payload.file_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        )
+
+    return conversation
+
+@conversation_router.delete(
+    "/{conversation_id}/dataset",
+    response_model=ConversationResponse,
+)
+async def remove_conversation_dataset(
+    conversation_id: uuid.UUID,
+    conversation_service: Annotated[
+        ConversationService, Depends(get_conversation_service)
+    ],
+):
+    conversation = await conversation_service.remove_dataset(conversation_id)
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        )
+
+    return {"message": "Dataset association removed successfully."}

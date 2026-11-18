@@ -5,11 +5,15 @@ import pandas as pd
 
 
 class DatasetRegistry:
-
     def __init__(self):
         self.datasets = {}
 
-    def register(self, df: pd.DataFrame, metadata: dict) -> str:
+    def register(
+        self,
+        df: pd.DataFrame,
+        metadata: dict,
+        dataset_id: str | None = None,
+    ) -> str:
         """Register a DataFrame and return its unique dataset ID."""
 
         if not isinstance(df, pd.DataFrame):
@@ -18,11 +22,14 @@ class DatasetRegistry:
         if df.empty:
             raise ValueError("Cannot register an empty dataset.")
 
-        dataset_id = str(uuid4())
+        if dataset_id is None:
+            dataset_id = str(uuid4())
+        elif dataset_id in self.datasets:
+            raise ValueError(f"Dataset already registered: {dataset_id}")
 
         self.datasets[dataset_id] = {
             "dataframe": df,
-            "metadata": metadata
+            "metadata": metadata,
         }
 
         return dataset_id
@@ -49,7 +56,7 @@ class DatasetRegistry:
         return [
             {
                 "dataset_id": dataset_id,
-                **entry["metadata"]
+                **entry["metadata"],
             }
             for dataset_id, entry in self.datasets.items()
         ]

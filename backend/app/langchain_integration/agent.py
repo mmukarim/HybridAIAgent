@@ -1,8 +1,6 @@
-from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.prebuilt import ToolNode, tools_condition
-
 from app.langchain_integration.gemini import GeminiChatModel
 from app.langchain_integration.tools import (
     add_numbers_tool,
@@ -13,6 +11,10 @@ from app.langchain_integration.tools import (
     build_dataset_analysis_tools,
 )
 from app.tools.dataset_registry import DatasetRegistry
+
+
+class AgentState(MessagesState):
+    dataset_id: str | None
 
 
 def build_agent(dataset_registry: DatasetRegistry, checkpointer=None):
@@ -37,12 +39,12 @@ def build_agent(dataset_registry: DatasetRegistry, checkpointer=None):
     model_with_tools = chat_model.bind_tools(tools)
 
     # 5. Define the LLM node
-    def call_model(state: MessagesState):
+    def call_model(state: AgentState):
         response = model_with_tools.invoke(state["messages"])
         return {"messages": [response]}
 
     # 6. Build the graph
-    builder = StateGraph(MessagesState)
+    builder = StateGraph(AgentState)
 
     builder.add_node("llm", call_model)
     builder.add_node("tools", ToolNode(tools))

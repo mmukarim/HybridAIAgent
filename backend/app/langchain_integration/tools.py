@@ -1,3 +1,6 @@
+from typing import Annotated
+
+from langchain.tools import InjectedState
 from langchain_core.tools import StructuredTool
 
 from app.agent.reporting import generate_business_report
@@ -48,30 +51,42 @@ def build_dataset_analysis_tools(
     dataset_registry: DatasetRegistry,
 ) -> list[StructuredTool]:
 
-    def profile_dataset(dataset_id: str) -> dict:
+    def require_dataset_id(dataset_id: str | None) -> str:
+        if not dataset_id:
+            raise ValueError(
+                "No dataset is associated with this conversation. "
+                "Please upload and associate a dataset first."
+            )
+        return dataset_id
+
+    def profile_dataset(dataset_id: Annotated[str | None, InjectedState("dataset_id")]) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return profile_registered_dataset(
             dataset_registry, dataset_id
         )
 
-    def analyze_column(dataset_id: str, column_name: str) -> dict:
+    def analyze_column(dataset_id: Annotated[str | None, InjectedState("dataset_id")], column_name: str) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return analyze_registered_column(
             dataset_registry, dataset_id, column_name
         )
 
     def analyze_correlations(
-        dataset_id: str,
+        dataset_id: Annotated[str | None, InjectedState("dataset_id")],
         method: str = "pearson"
     ) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return analyze_registered_correlations(
             dataset_registry, dataset_id, method
         )
 
     def aggregate_data(
-        dataset_id: str,
+        dataset_id: Annotated[str | None, InjectedState("dataset_id")],
         group_by: str,
         value_column: str,
         operation: str = "sum"
     ) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return aggregate_registered_data(
             dataset_registry,
             dataset_id,
@@ -81,12 +96,13 @@ def build_dataset_analysis_tools(
         )
 
     def generate_chart(
-        dataset_id: str,
+        dataset_id: Annotated[str | None, InjectedState("dataset_id")],
         chart_type: str,
         x_column: str,
         y_column: str = None,
         title: str = None
     ) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return generate_registered_chart(
             registry=dataset_registry,
             dataset_id=dataset_id,
@@ -97,11 +113,12 @@ def build_dataset_analysis_tools(
         )
 
     def generate_business_insights(
-        dataset_id: str,
+        dataset_id: Annotated[str | None, InjectedState("dataset_id")],
         group_by: str,
         value_column: str,
         operation: str = "sum"
     ) -> dict:
+        dataset_id = require_dataset_id(dataset_id)
         return generate_registered_business_insights(
             registry=dataset_registry,
             dataset_id=dataset_id,
@@ -111,17 +128,18 @@ def build_dataset_analysis_tools(
         )
 
     def create_business_report(
-    dataset_id: str,
+    dataset_id: Annotated[str | None, InjectedState("dataset_id")],
     group_by: str,
     value_column: str,
     operation: str = "sum",
     ) -> str:
+        dataset_id = require_dataset_id(dataset_id)
         return generate_business_report(
             registry=dataset_registry,
             dataset_id=dataset_id,
             group_by=group_by,
             value_column=value_column,
-            operation=operation,
+            operation=operation
         )
 
     return [

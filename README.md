@@ -1,648 +1,733 @@
 # Hybrid AI Agent
 
-A Python-based Hybrid AI Agent that integrates multiple LLM providers, executes tools, orchestrates agent workflows, and performs intelligent business data analysis.
+A hybrid AI agent built with Python, LangChain, LangGraph, FastAPI, and PostgreSQL. The project combines a custom agent implementation with a LangGraph-based agent, supporting conversational interactions, mathematical operations, text analysis, and data-driven business analysis.
 
-The project combines custom agent orchestration with LangChain and LangGraph, allowing experimentation with different approaches to tool calling, conversation memory, and data-driven reasoning.
+The application supports both an interactive CLI and a REST API. The API provides persistent conversations, file uploads, dataset management, and conversation history retrieval.
 
-It currently supports:
+## Table of Contents
 
-- **Google Gemini** as the primary cloud LLM.
-- **Ollama** as a local LLM provider.
-- **Hybrid model routing** based on task complexity.
-- **Custom tool-calling agent** with iterative execution.
-- **LangChain and LangGraph** for graph-based agent orchestration.
-- **Conversation checkpointing** using LangGraph.
-- **CSV and Excel data ingestion** using Pandas.
-- **Statistical analysis and business insights** using Python.
-- **Chart generation** using Matplotlib.
-- **Business report generation** using Gemini.
+- [Features](#features)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation and Setup](#installation-and-setup)
+- [Environment Configuration](#environment-configuration)
+- [Database and Migrations](#database-and-migrations)
+- [Running the Application](#running-the-application)
+- [CLI Usage](#cli-usage)
+- [REST API](#rest-api)
+- [File and Dataset Management](#file-and-dataset-management)
+- [Conversation Management](#conversation-management)
+- [LangGraph and Persistence](#langgraph-and-persistence)
+- [Available Tools](#available-tools)
+- [Storage Architecture](#storage-architecture)
+- [Current Limitations](#current-limitations)
 
----
+## Features
 
-## Project Overview
+### AI Agent
 
-The application supports two agent implementations:
+- Custom agent implementation using a tool registry and LLM abstraction.
+- LangGraph-based agent with a stateful execution workflow.
+- Gemini and Ollama provider integrations.
+- Tool calling through LangChain.
+- Support for multiple conversation threads.
+- Persistent conversation state through PostgreSQL checkpoints in the API application.
 
-1. **Custom Agent:** A direct implementation of the LLM tool-calling loop using Google's GenAI SDK and a custom tool registry.
-2. **LangGraph Agent:** A graph-based implementation using LangChain tools, LangGraph state management, conditional routing, and checkpointing.
+### Data Analysis
 
-Both implementations support the data analysis workflow through a shared dataset registry and reusable Python analysis functions.
+- Load datasets from CSV, XLSX, and XLS files.
+- Dataset profiling and column analysis.
+- Statistical and correlation analysis.
+- Group-based aggregation.
+- Chart generation.
+- Business insights generation.
+- Automated business report generation.
 
-The application can analyze datasets, generate statistical summaries, identify business insights, create charts, and produce natural-language business reports.
+### REST API
+
+- Create conversations lazily when the first message is submitted.
+- Continue existing conversations.
+- Retrieve conversation metadata.
+- Retrieve complete user-facing message history, including tool responses.
+- Delete conversations.
+- Upload, list, retrieve, and delete files.
+- Load uploaded files as datasets.
+- Associate datasets with conversations.
+- Change or remove a conversation's associated dataset.
+
+### Persistence
+
+- PostgreSQL for application metadata.
+- SQLAlchemy asynchronous database operations.
+- Alembic database migrations.
+- LangGraph PostgreSQL checkpointer for conversation state.
+- Local file storage with a storage abstraction.
+- Automatic dataset reloading when an associated dataset is missing from the in-memory registry.
 
 ## Architecture
 
-### High-level workflow
+The project follows a layered architecture with separate responsibilities for the API, services, agent execution, tools, database, and storage.
 
 ```text
-                       User Input
-                            |
-                            v
-                    Agent Selection
-                            |
-                 +----------+----------+
-                 |                     |
-                 v                     v
-            Custom Agent          LangGraph Agent
-                 |                     |
-                 v                     v
-          Agent Executor           StateGraph
-                 |                     |
-                 +----------+----------+
-                            |
-                            v
-                     LLM Integration
-                            |
-                    +-------+-------+
-                    |               |
-                    v               v
-                  Gemini          Ollama
-                    |
-                    v
-                Tool Selection
-                    |
-                    v
-                Tool Registry
-                    |
-          +---------+----------+
-          |                    |
-          v                    v
-     Basic Tools         Data Analysis Tools
-                               |
-                        +------+------+
-                        |             |
-                        v             v
-                   Pandas Analysis  Matplotlib
-                        |
-                        v
-                  Business Insights
-                        |
-                        v
-                  Gemini Reporting
-                        |
-                        v
-                  Final Response
+                    Client / User
+                          |
+              +-----------+-----------+
+              |                       |
+             CLI                  FastAPI
+              |                       |
+       +------+-------+        +------+-------+
+       |              |        |              |
+  Custom Agent   LangGraph  API Routes    Dependencies
+       |              |        |              |
+       |              |        +------+-------+
+       |              |               |
+       |              |          Services
+       |              |               |
+       +--------------+---------------+
+                      |
+                 LangGraph Agent
+                      |
+                LLM + ToolNode
+                      |
+             +--------+---------+
+             |                  |
+          LLM Providers      Agent Tools
+             |                  |
+        Gemini / Ollama    Analysis / Data
+                                |
+                         Dataset Registry
+                                |
+                  +-------------+-------------+
+                  |                           |
+              PostgreSQL                 File Storage
+           Metadata + Checkpoints       Uploaded Files
 ```
 
-## Repository Structure
-
-```text
-hybrid-ai-agent/
-├── .env
-├── .env.example
-├── .gitignore
-├── requirements.txt
-└── app/
-    ├── __init__.py
-    ├── config.py
-    ├── main.py
-    ├── test.py
-    │
-    ├── agent/
-    │   ├── __init__.py
-    │   ├── executor.py
-    │   └── reporting.py
-    │
-    ├── llm/
-    │   ├── __init__.py
-    │   ├── base.py
-    │   ├── factory.py
-    │   ├── gemini.py
-    │   ├── ollama.py
-    │   └── router.py
-    │
-    ├── langchain_integration/
-    │   ├── __init__.py
-    │   ├── agent.py
-    │   ├── gemini.py
-    │   └── tools.py
-    │
-    └── tools/
-        ├── __init__.py
-        ├── calculator.py
-        ├── data_analysis.py
-        ├── data_loader.py
-        ├── dataset_registry.py
-        ├── registration.py
-        ├── registry.py
-        ├── schemas.py
-        └── text_analyzer.py
-```
-
-## Key Components
-
-### 1. LLM Provider Integration
-
-The `app/llm` package provides a common abstraction for interacting with different LLM providers.
+### Architectural components
 
 | Component | Responsibility |
 |---|---|
-| `base.py` | Defines the abstract LLM provider interface |
-| `gemini.py` | Integrates Google Gemini using the GenAI SDK |
-| `ollama.py` | Integrates locally hosted Ollama models |
-| `factory.py` | Creates provider instances |
-| `router.py` | Routes tasks to appropriate LLM providers |
+| CLI | Interactive command-line interface |
+| FastAPI | REST API application |
+| Agent | Agent construction and execution |
+| LLM | Provider abstraction and model integration |
+| LangChain integration | LangChain tools and LangGraph workflow |
+| Tools | Deterministic calculations and data analysis |
+| Services | Application business logic |
+| Database | Persistent application metadata |
+| Checkpointer | Persistent LangGraph execution state |
+| Storage | Uploaded file storage |
+| Dataset Registry | Runtime DataFrame registration and retrieval |
 
-The provider abstraction allows the application to switch between models without coupling the agent executor to a specific LLM implementation.
+## Technology Stack
 
-### 2. Hybrid Model Routing
-
-`app/llm/router.py` implements `HybridModelRouter`.
-
-The current routing policy is:
-
-| Task Type | Provider |
+| Category | Technology |
 |---|---|
-| Simple | Ollama |
-| Classification | Ollama |
-| Local-only | Ollama |
-| Complex | Gemini |
-| Analysis | Gemini |
+| Language | Python |
+| API Framework | FastAPI |
+| Agent Framework | LangChain |
+| Agent Orchestration | LangGraph |
+| LLM Providers | Google Gemini, Ollama |
+| Database | PostgreSQL |
+| ORM | SQLAlchemy |
+| Database Driver | asyncpg |
+| Migrations | Alembic |
+| Data Processing | Pandas |
+| Dataset Support | CSV, Excel |
+| Containerization | Docker |
+| API Documentation | Swagger UI / OpenAPI |
 
-This provides a foundation for balancing local inference, cloud model capabilities, and execution costs.
-
-### 3. Tool System
-
-The `app/tools` package contains framework-independent Python functions used by both agent implementations.
-
-#### Basic tools
-
-- `add_numbers(a, b)`
-- `subtract_numbers(a, b)`
-- `multiply_numbers(a, b)`
-- `divide_numbers(a, b)`
-- `get_text_statistics(text)`
-
-#### Data analysis tools
-
-- `profile_dataset(dataset_id)`
-- `analyze_column(dataset_id, column_name)`
-- `analyze_correlations(dataset_id, method)`
-- `aggregate_data(dataset_id, group_by, value_column, operation)`
-- `generate_chart(dataset_id, chart_type, x_column, y_column, title)`
-- `generate_business_insights(dataset_id, group_by, value_column, operation)`
-- `generate_business_report(dataset_id, group_by, value_column, operation)`
-
-The exact callable signatures include dataset registry dependencies where appropriate.
-
-#### Tool registry
-
-`app/tools/registry.py` provides a generic `ToolRegistry` that:
-
-- Registers callable Python functions.
-- Validates tool names and arguments.
-- Executes functions dynamically.
-- Handles unknown tools and invalid arguments.
-
-`app/tools/registration.py` centralizes tool registration and supports dataset-aware tool dependencies.
-
-`app/tools/schemas.py` defines the JSON schemas used by the custom Gemini function-calling implementation.
-
-### 4. Custom Agent Executor
-
-`app/agent/executor.py` implements the custom agent execution loop.
-
-Its responsibilities include:
-
-1. Sending user input and available tool schemas to Gemini.
-2. Detecting function calls in model responses.
-3. Executing requested functions through the tool registry.
-4. Returning tool results to the LLM.
-5. Continuing execution until the model produces a final response.
-6. Handling execution errors and limiting the number of tool-call rounds.
-
-The implementation supports sequential and dependent tool calls, where the output of one tool can be used as the input to another.
-
-### 5. LangChain and LangGraph Integration
-
-The `app/langchain_integration` package provides an alternative implementation using LangChain and LangGraph.
-
-#### Gemini wrapper
-
-`gemini.py` wraps `ChatGoogleGenerativeAI` and provides methods for:
-
-- Invoking the model with text prompts.
-- Invoking the model with message histories.
-- Binding tools to the model.
-
-#### StructuredTool adapters
-
-`tools.py` converts framework-independent Python functions into LangChain `StructuredTool` instances.
-
-It provides adapters for basic tools and dataset analysis tools, including chart generation and business reporting.
-
-Dataset registry dependencies are injected into the adapters rather than embedded in the underlying business logic.
-
-#### LangGraph agent
-
-`agent.py` builds the agent workflow using:
-
-- `StateGraph`
-- `MessagesState`
-- `ToolNode`
-- `tools_condition`
-- `START`
-- `InMemorySaver`
-
-The graph follows this execution pattern:
+## Project Structure
 
 ```text
-START
-  |
-  v
-LLM Node
-  |
-  v
-Conditional Routing
-  |
-  +---- Tool Calls ----> Tool Node
-  |                         |
-  |                         v
-  |                       LLM Node
-  |
-  +---- Final Response --> END
+HybridAIAgent/
+│
+├── app/
+│   ├── __init__.py
+│   │
+│   ├── agent/
+│   │   ├── executor.py
+│   │   └── ...
+│   │
+│   ├── api/
+│   │   ├── dependencies.py
+│   │   ├── routes/
+│   │   │   ├── conversations.py
+│   │   │   ├── messages.py
+│   │   │   └── files.py
+│   │   └── schemas/
+│   │       ├── conversations.py
+│   │       ├── messages.py
+│   │       └── files.py
+│   │
+│   ├── database/
+│   │   ├── base.py
+│   │   ├── manager.py
+│   │   ├── checkpointer.py
+│   │   └── models/
+│   │
+│   ├── langchain_integration/
+│   │   ├── agent.py
+│   │   ├── gemini.py
+│   │   └── tools.py
+│   │
+│   ├── llm/
+│   │   ├── factory.py
+│   │   └── ...
+│   │
+│   ├── services/
+│   │   ├── agent_service.py
+│   │   ├── conversation_service.py
+│   │   ├── dataset_service.py
+│   │   └── file_service.py
+│   │
+│   ├── storage/
+│   │   ├── base.py
+│   │   └── local.py
+│   │
+│   ├── tools/
+│   │   ├── dataset_registry.py
+│   │   ├── data_loader.py
+│   │   ├── pandas_analysis.py
+│   │   ├── chart_generator.py
+│   │   ├── business_insights.py
+│   │   └── ...
+│   │
+│   ├── samplesales.csv
+│   ├── cli.py
+│   ├── main.py
+│   └── config.py
+│
+├── migrations/
+│   ├── versions/
+│   └── env.py
+│
+├── storage/
+│   └── uploads/
+│
+├── .env
+├── .gitignore
+├── alembic.ini
+├── docker-compose.yml
+├── requirements.txt
+└── README.md
 ```
 
-The LLM node decides whether to respond directly or invoke tools. The ToolNode executes requested functions and returns their results to the LLM.
+*The structure above represents the main architectural components. Some directories may contain additional implementation files.*
 
-### 6. Conversation Memory and Checkpointing
+## Prerequisites
 
-The LangGraph implementation uses `InMemorySaver` for conversation checkpointing.
+Make sure the following tools are installed:
 
-Key capabilities include:
-
-- Maintaining conversation state across multiple interactions.
-- Using thread IDs to identify separate conversations.
-- Isolating conversations using different thread IDs.
-- Inspecting graph state and execution history.
-
-The current implementation provides in-memory, thread-scoped checkpointing. Conversation state is not persisted across application restarts.
-
-### 7. Dataset Ingestion and Management
-
-The application uses Pandas to load and manage business datasets.
-
-`app/tools/data_loader.py` supports:
-
-- CSV files.
-- Excel XLSX files.
-- File existence and extension validation.
-- Dataset metadata extraction.
-
-Dataset metadata includes:
-
-- File name.
-- File format.
-- Row count.
-- Column count.
-- Column names.
-
-`app/tools/dataset_registry.py` implements an in-memory `DatasetRegistry`.
-
-Each registered dataset receives a unique UUID that can be referenced by the agent's data analysis tools.
-
-The registry supports:
-
-- Dataset registration.
-- Dataset retrieval.
-- Metadata retrieval.
-- Dataset listing.
-- Dataset removal.
-
-The registry is shared between agent components so that both Custom Agent and LangGraph Agent can access the same registered datasets.
-
-### 8. Data Analysis Engine
-
-`app/tools/data_analysis.py` implements the core analytical functionality using Pandas and Python.
-
-#### Dataset profiling
-
-`profile_dataset()` provides:
-
-- Dataset dimensions.
-- Column names and data types.
-- Missing-value counts and percentages.
-- Duplicate row counts.
-- Numeric descriptive statistics.
-- Categorical summaries.
-
-#### Column analysis
-
-`analyze_column()` supports numeric and categorical analysis.
-
-For numeric columns, it calculates:
-
-- Mean.
-- Median.
-- Standard deviation.
-- Minimum and maximum.
-- Percentiles and quartiles.
-
-For categorical columns, it provides:
-
-- Unique value counts.
-- Most frequent values.
-- Frequency distributions.
-
-#### Correlation analysis
-
-`analyze_correlations()` supports:
-
-- Pearson correlation.
-- Spearman correlation.
-- Kendall correlation.
-
-It generates correlation matrices and summarizes relationships between numeric variables.
-
-Correlation results describe statistical relationships and do not establish causation.
-
-#### Data aggregation
-
-`aggregate_data()` supports group-based aggregation operations such as:
-
-- Sum.
-- Mean.
-- Median.
-- Minimum.
-- Maximum.
-
-The results can be used by other analytical functions to generate business insights.
-
-#### Business insights
-
-`generate_business_insights()` derives structured insights from aggregated results, including:
-
-- Total aggregated value for sum operations.
-- Number of groups.
-- Highest-performing group.
-- Lowest-performing group.
-- Group-level values.
-- Contribution percentages for sum operations.
-
-### 9. Chart Generation
-
-The project uses Matplotlib for chart generation.
-
-`generate_chart()` currently supports:
-
-| Chart Type | Purpose |
-|---|---|
-| Bar | Compare values across categories |
-| Line | Visualize trends across ordered data |
-| Scatter | Explore relationships between two numeric variables |
-| Histogram | Examine the distribution of numeric data |
-
-Generated charts are saved as PNG files, and the tool returns their file paths and relevant metadata.
-
-### 10. Business Report Generation
-
-`app/agent/reporting.py` combines deterministic Python analysis with Gemini-based natural-language interpretation.
-
-The workflow is:
-
-1. Retrieve the registered dataset.
-2. Execute Python-based business analysis.
-3. Generate structured analytical results.
-4. Pass those results to Gemini.
-5. Generate a structured business report.
-
-The reporting implementation uses deterministic analytical results as its source of truth.
-
-The reporting prompt enforces important constraints:
-
-- Do not recalculate or modify numerical results.
-- Do not invent missing metrics or business context.
-- Do not assume currency, units, or reporting periods.
-- Distinguish observed facts from interpretations.
-- Label possible explanations as hypotheses.
-- Do not infer causation from statistical relationships.
-- Identify assumptions behind recommendations.
-- Explicitly mention data limitations.
-
-The generated report includes:
-
-- Executive Summary.
-- Key Findings.
-- Business Implications.
-- Recommendations.
-- Limitations.
-
-## Configuration
-
-Create a `.env` file in the project root based on `.env.example`.
-
-Example:
-
-```env
-GEMINI_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-3.5-flash-lite
-OLLAMA_MODEL=qwen3:1.7b
-OLLAMA_HOST=http://localhost:11434
-```
-
-Configuration is managed through `app/config.py` and environment variables.
-
-**Important:** Keep API keys and other secrets in `.env`. Do not commit this file to version control.
-
-## Installation
-
-### Prerequisites
-
-- Python 3.13 or compatible Python version.
-- Google Gemini API key.
-- Ollama installed locally if local model inference is required.
+- Python 3.13 or compatible version.
+- PostgreSQL.
+- Docker and Docker Compose (if running PostgreSQL through Docker).
 - Git.
+- Gemini API credentials or a configured Ollama environment.
+
+## Installation and Setup
 
 ### 1. Clone the repository
 
 ```bash
 git clone <repository-url>
-cd hybrid-ai-agent
+cd HybridAIAgent
 ```
 
 ### 2. Create a virtual environment
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 ```
 
-### 3. Activate the virtual environment
+Activate it.
 
-macOS/Linux:
+macOS / Linux:
 
 ```bash
 source .venv/bin/activate
 ```
 
-### 4. Install dependencies
+Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Configure environment variables
+### 4. Configure environment variables
 
-Create `.env` using `.env.example` and provide the required Gemini API key and model configuration.
+Create a `.env` file in the project root.
 
-### 6. Start Ollama (if using local inference)
+Refer to `app/config.py` for the complete list of application settings and their exact environment variable names.
 
-Ensure the Ollama service is running and the configured model is available.
+At minimum, configure:
 
-For example:
+- PostgreSQL connection URL.
+- LLM provider credentials and settings.
+- File storage directory.
+- Maximum upload size.
+
+Example file-storage configuration:
+
+```env
+FILE_STORAGE_PATH=storage/uploads
+MAX_UPLOAD_SIZE_MB=50
+```
+
+Do not commit API keys, passwords, or other secrets to version control.
+
+### 5. Prepare PostgreSQL
+
+You can use an existing PostgreSQL instance or start the configured database service through Docker Compose:
 
 ```bash
-ollama pull qwen3:1.7b
+docker compose up -d
 ```
+
+Create the application database if it does not already exist:
+
+```sql
+CREATE DATABASE hybrid_ai_agent;
+```
+
+Make sure the database connection configuration matches your PostgreSQL credentials and database name.
+
+## Database and Migrations
+
+The project uses SQLAlchemy's asynchronous engine and Alembic for database schema management.
+
+### Apply migrations
+
+```bash
+alembic upgrade head
+```
+
+### Check the current migration revision
+
+```bash
+alembic current
+```
+
+### Generate a migration
+
+After modifying ORM models:
+
+```bash
+alembic revision --autogenerate -m "describe schema change"
+```
+
+Review the generated migration before applying it.
+
+```bash
+alembic upgrade head
+```
+
+### Database responsibilities
+
+The application database stores metadata such as:
+
+- Conversations.
+- Uploaded file metadata.
+- Conversation-to-dataset associations.
+
+LangGraph checkpoint data is managed separately by `AsyncPostgresSaver`. Its checkpoint tables are initialized through the checkpointer setup.
 
 ## Running the Application
 
-Activate the virtual environment and run:
+The project supports two execution modes.
+
+### 1. Run the CLI
 
 ```bash
-python -m app.main
+python -m app.cli
 ```
 
-The application provides an interactive CLI where you can select the agent implementation and interact with the selected agent.
+The CLI allows users to select the agent implementation and optionally load a dataset.
 
-The application supports:
+Available modes:
 
-- Custom Agent.
-- LangGraph Agent.
+- Custom agent.
+- LangGraph agent.
 
-You can also provide a local dataset path during initialization to make the dataset available to the analysis tools.
-
-## Example Use Cases
-
-### 1. Basic tool calling
-
-```text
-Add 25 and 17, then multiply the result by 2.
-```
-
-The agent can execute sequential arithmetic operations through its calculator tools.
-
-### 2. Text analysis
-
-```text
-Tell me how many words are in this sentence:
-"The future of AI is collaborative and practical."
-```
-
-The agent can invoke the text statistics tool.
-
-### 3. Dataset profiling
-
-```text
-Profile the loaded dataset and summarize its columns,
-data types, missing values, and duplicate rows.
-```
-
-### 4. Statistical analysis
-
-```text
-Analyze the revenue column and calculate its mean,
-median, standard deviation, minimum, and maximum.
-```
-
-### 5. Correlation analysis
-
-```text
-Analyze the correlations between the numeric columns
-using Pearson correlation.
-```
-
-### 6. Business aggregation
-
-```text
-Calculate total revenue grouped by product.
-```
-
-### 7. Chart generation
-
-```text
-Generate a bar chart showing revenue by product.
-```
-
-### 8. Business report generation
-
-```text
-Generate a business report for total revenue grouped by product.
-Identify the highest and lowest performing products and
-their contribution percentages.
-```
-
-The agent performs deterministic analysis using Python and then uses Gemini to interpret the results in a structured business report.
-
-## Testing
-
-The project includes a basic smoke-test module at:
-
-```text
-app/test.py
-```
-
-Run it using:
+### 2. Run the REST API
 
 ```bash
-python -m app.test
+uvicorn app.main:agent_app --reload
 ```
 
-Additional functionality has been tested through direct tool execution and agent interactions, including:
+Open Swagger UI:
 
-- Calculator operations.
-- Sequential tool calling.
-- Division-by-zero handling.
-- Text statistics.
-- LangGraph tool execution.
-- Conversation checkpointing.
-- Dataset ingestion and registration.
-- Dataset profiling and column analysis.
-- Correlation analysis.
-- Data aggregation.
-- Chart generation.
-- Business insights generation.
-- Business report generation through the agent.
+```text
+http://127.0.0.1:8000/docs
+```
 
-## Dependencies
+Open the OpenAPI specification:
 
-The project uses the following primary libraries:
+```text
+http://127.0.0.1:8000/openapi.json
+```
 
-| Library | Purpose |
+## CLI Usage
+
+The CLI provides an interactive interface for experimenting with both agent implementations.
+
+### Custom Agent
+
+The custom agent uses:
+
+- `LLMFactory` for model creation.
+- `ToolRegistry` for tool registration.
+- `AgentExecutor` for execution.
+
+It uses the existing registry-based tool implementation.
+
+### LangGraph Agent
+
+The LangGraph agent uses:
+
+- `StateGraph`.
+- `MessagesState` extended with dataset context.
+- `ToolNode`.
+- `tools_condition`.
+- A configurable checkpointer.
+
+The CLI uses an in-memory checkpointer, while the FastAPI application uses PostgreSQL persistence.
+
+### Dataset loading
+
+At startup, the CLI prompts for a dataset file path.
+
+Example:
+
+```text
+Enter dataset file path (press Enter to skip):
+```
+
+To use the included sample dataset, enter:
+
+```text
+app/samplesales.csv
+```
+
+Press Enter to skip dataset loading.
+
+## REST API
+
+The REST API is organized around conversations, messages, and files.
+
+The default API prefix is:
+
+```text
+/api/v1
+```
+
+### Conversation endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/messages` | Create a conversation and process its first message |
+| POST | `/api/v1/conversations/{conversation_id}/messages` | Send a message to an existing conversation |
+| GET | `/api/v1/conversations` | List saved conversations |
+| GET | `/api/v1/conversations/{conversation_id}` | Retrieve conversation details |
+| DELETE | `/api/v1/conversations/{conversation_id}` | Delete a conversation and its LangGraph checkpoint |
+| PUT | `/api/v1/conversations/{conversation_id}/dataset` | Associate a dataset with a conversation |
+| DELETE | `/api/v1/conversations/{conversation_id}/dataset` | Remove the dataset association |
+
+### Message history endpoint
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/v1/conversations/{conversation_id}/messages` | Retrieve conversation message history |
+
+The history endpoint returns user messages, final assistant responses, and tool execution results.
+
+Example response:
+
+```json
+{
+  "conversation_id": "your-conversation-uuid",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Calculate 150 * 20"
+    },
+    {
+      "role": "tool",
+      "content": "3000"
+    },
+    {
+      "role": "assistant",
+      "content": "The result is 3,000."
+    }
+  ],
+  "total": 3
+}
+```
+
+Intermediate assistant tool-call instructions are excluded from this simplified history representation.
+
+### File endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/files` | Upload a file |
+| GET | `/api/v1/files` | List uploaded files |
+| GET | `/api/v1/files/{file_id}` | Retrieve file metadata |
+| DELETE | `/api/v1/files/{file_id}` | Delete an uploaded file |
+| POST | `/api/v1/files/{file_id}/load` | Load a file as a dataset |
+
+Supported formats:
+
+- CSV (`.csv`)
+- Excel (`.xlsx`)
+- Excel 97–2003 (`.xls`)
+
+The configured maximum upload size is controlled by `MAX_UPLOAD_SIZE_MB`.
+
+## File and Dataset Management
+
+The application separates physical file storage from runtime dataset management.
+
+### File upload flow
+
+1. The client uploads a file through the REST API.
+2. `FileService` validates the file extension and size.
+3. `LocalStorage` saves the file using a generated storage key.
+4. File metadata is stored in PostgreSQL.
+5. The API returns the file metadata and its UUID.
+
+The original filename is retained in the database, while the physical file uses a generated storage key.
+
+### Dataset loading flow
+
+1. The client requests the dataset load endpoint.
+2. `DatasetService` retrieves the file metadata.
+3. The physical file is located through the storage abstraction.
+4. Pandas loads the CSV or Excel file.
+5. The DataFrame is registered in `DatasetRegistry`.
+6. The file UUID is used as the dataset ID.
+
+### Dataset association
+
+A dataset can be associated with a conversation using:
+
+```text
+PUT /api/v1/conversations/{conversation_id}/dataset
+```
+
+The association is stored in the conversation record.
+
+The conversation can subsequently use the associated dataset without requiring the LLM to supply a dataset ID.
+
+### Automatic dataset recovery
+
+`DatasetRegistry` is an in-memory registry. Its contents are lost when the application restarts.
+
+To address this, `AgentService` checks whether the conversation's associated dataset is registered before invoking LangGraph.
+
+If it is missing, `DatasetService` reloads it from persistent file storage.
+
+This allows existing conversations to continue using their associated datasets after an application restart.
+
+### Dataset removal and deletion
+
+- Removing a dataset association sets the conversation's `dataset_id` to `NULL`.
+- Deleting an associated file sets the referencing conversation's `dataset_id` to `NULL` through the foreign key's `ON DELETE SET NULL` behavior.
+
+## Conversation Management
+
+The application uses lazy conversation creation.
+
+An empty conversation is not persisted when a user simply starts a new conversation.
+
+Instead, the conversation is created when the first message is submitted.
+
+### First message
+
+```text
+POST /api/v1/messages
+```
+
+This operation:
+
+1. Creates a conversation record.
+2. Uses the conversation UUID as the LangGraph thread ID.
+3. Invokes the agent with the first user message.
+4. Persists the execution state through the PostgreSQL checkpointer.
+
+### Subsequent messages
+
+```text
+POST /api/v1/conversations/{conversation_id}/messages
+```
+
+The application retrieves the existing conversation and resumes the corresponding LangGraph thread.
+
+### Conversation history
+
+```text
+GET /api/v1/conversations/{conversation_id}/messages
+```
+
+The API retrieves the latest LangGraph checkpoint state and transforms its messages into API-friendly history entries.
+
+Supported roles:
+
+| Role | Description |
 |---|---|
-| `google-genai` | Direct Google Gemini integration |
-| `ollama` | Local LLM integration |
-| `python-dotenv` | Environment configuration |
-| `langchain` | LLM and tool abstractions |
-| `langchain-core` | Message and tool interfaces |
-| `langchain-google-genai` | Gemini integration for LangChain |
-| `langchain-ollama` | Ollama integration for LangChain |
-| `langgraph` | Agent graph orchestration and checkpointing |
-| `pandas` | Dataset loading and analysis |
-| `openpyxl` | Excel XLSX support |
-| `matplotlib` | Chart generation |
+| `user` | User-submitted message |
+| `assistant` | Final assistant response |
+| `tool` | Tool execution result |
 
-Refer to `requirements.txt` for the exact installed and pinned package versions.
+## LangGraph and Persistence
 
-## Design Principles
+The LangGraph implementation follows a simple tool-calling workflow.
 
-The project follows several architectural principles:
+```text
+             START
+                |
+                v
+              LLM
+                |
+                v
+       Tool Calls Required?
+           /         \
+         Yes          No
+          |            |
+          v            v
+        TOOLS         END
+          |
+          v
+         LLM
+```
 
-1. **Provider abstraction:** Keep LLM provider implementations separate from agent orchestration.
-2. **Framework-independent tools:** Keep business logic in `app/tools/` rather than coupling it to LangChain.
-3. **Reusable tool adapters:** Use LangChain adapters to expose existing Python functions to LangGraph.
-4. **Separation of analysis and interpretation:** Use Python for deterministic calculations and Gemini for natural-language interpretation.
-5. **Shared dataset management:** Use a common dataset registry across agent implementations.
-6. **Explicit tool schemas:** Define tool arguments and descriptions to support structured function calling.
-7. **Controlled LLM reporting:** Ground generated reports in analytical results and explicitly communicate limitations.
+### Graph components
 
-## Limitations
+| Component | Responsibility |
+|---|---|
+| `StateGraph` | Defines the agent workflow |
+| `MessagesState` | Maintains conversational messages |
+| `AgentState` | Extends the graph state with dataset context |
+| `ToolNode` | Executes selected tools |
+| `tools_condition` | Determines whether tool execution is required |
+| `InMemorySaver` | Provides CLI checkpointing |
+| `AsyncPostgresSaver` | Provides persistent API checkpointing |
 
-- Dataset registry and conversation checkpointing currently use in-memory storage.
-- Dataset registrations and conversation checkpoints are lost when the process restarts.
-- Generated charts are saved as local PNG files rather than embedded directly in chat responses.
-- The hybrid routing policy is implemented separately from the LangGraph workflow.
-- The current implementation is a learning and experimentation project, not a production-ready enterprise agent framework.
+### Conversation identification
+
+Each conversation uses its UUID as the LangGraph `thread_id`.
+
+Example:
+
+```python
+config = {
+    "configurable": {
+        "thread_id": str(conversation_id)
+    }
+}
+```
+
+This allows the application to resume the correct conversation state when a new message arrives.
+
+### Dataset context injection
+
+Dataset IDs are supplied through graph state and injected into dataset-analysis tools using LangGraph's `InjectedState`.
+
+This prevents the LLM from having to generate or select internal dataset IDs as tool arguments.
+
+The current dataset association is obtained from the conversation record and supplied on each agent invocation.
+
+## Available Tools
+
+The application includes deterministic tools for mathematical, text, and dataset analysis.
+
+### Mathematical tools
+
+- Addition.
+- Subtraction.
+- Multiplication.
+- Division.
+
+### Text analysis
+
+- Text statistics.
+
+### Dataset analysis
+
+The LangGraph dataset tool collection includes:
+
+| Tool | Description |
+|---|---|
+| `profile_dataset` | Dataset overview and profiling |
+| `analyze_column` | Analyze an individual column |
+| `analyze_correlations` | Calculate correlations |
+| `aggregate_data` | Perform grouped aggregations |
+| `generate_chart` | Generate data visualizations |
+| `generate_business_insights` | Generate business-oriented insights |
+| `create_business_report` | Create a structured business report |
+
+The tools use the existing deterministic analysis functions rather than relying on the LLM to calculate analytical results directly.
+
+## Storage Architecture
+
+The project uses a storage abstraction to separate file-management logic from the underlying storage implementation.
+
+### BaseStorage
+
+Defines the common storage interface:
+
+- `save()`
+- `get_path()`
+- `delete()`
+- `exists()`
+
+### LocalStorage
+
+The current implementation stores uploaded files locally.
+
+Default configuration:
+
+```env
+FILE_STORAGE_PATH=storage/uploads
+```
+
+Files are saved using UUID-based storage keys to avoid filename collisions.
+
+The upload directory should not be committed to version control.
+
+## Current Limitations
+
+The current implementation is designed primarily for local development and a single-user environment.
+
+Important limitations include:
+
+1. **No authentication:** API endpoints do not currently implement user authentication or authorization.
+2. **Single-user design:** Conversations and uploaded files are not currently scoped to individual users.
+3. **Local file storage:** The current storage implementation uses the local filesystem.
+4. **In-memory dataset registry:** DataFrames are held in application memory and reloaded from storage when needed.
+5. **CLI persistence:** The CLI uses an in-memory LangGraph checkpointer, unlike the API's PostgreSQL checkpointer.
+6. **No frontend:** The REST API is the primary interface for application integration.
+7. **File validation:** Extension and upload-size checks are implemented; client-provided MIME types should not be treated as proof of file contents.
+
+## Development Notes
+
+- Keep deterministic analysis logic separate from LLM reasoning.
+- Keep agent orchestration separate from API route handlers.
+- Use services for application business logic.
+- Keep database operations asynchronous in the API application.
+- Use the conversation UUID consistently as the LangGraph thread ID.
+- Preserve compatibility between the custom agent CLI and LangGraph CLI.
+- Use Alembic migrations for database schema changes.
+- Do not commit `.env`, uploaded files, or other sensitive data.
 
 ## License
 
-This repository currently does not include a license file. Add an appropriate license before distributing or publishing the project for reuse.
+Add the project's applicable license information here.

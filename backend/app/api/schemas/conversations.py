@@ -26,3 +26,7 @@ class ConversationResponse(BaseModel):
 class ConversationListResponse(BaseModel):
     conversations: list[ConversationResponse]
     total: int
+
+
+class ConversationDatasetUpdate(BaseModel):
+    file_id: uuid.UUID

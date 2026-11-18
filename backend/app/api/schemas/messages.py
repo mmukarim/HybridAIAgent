@@ -14,3 +14,14 @@ class MessageResponse(BaseModel):
     conversation_id: uuid.UUID
     message: str
     response: str
+
+
+class MessageHistoryItem(BaseModel):
+    role: str
+    content: str
+
+
+class MessageHistoryResponse(BaseModel):
+    conversation_id: uuid.UUID
+    messages: list[MessageHistoryItem]
+    total: int

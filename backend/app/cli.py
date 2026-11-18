@@ -32,7 +32,7 @@ def select_agent() -> str:
         print("Invalid choice. Please enter 1 or 2.")
 
 
-def initialize_dataset(dataset_registry: DatasetRegistry):
+def initialize_dataset(dataset_registry: DatasetRegistry) -> str | None:
     """Optionally load and register a dataset."""
 
     file_path = input(
@@ -53,6 +53,8 @@ def initialize_dataset(dataset_registry: DatasetRegistry):
         print(f"File: {metadata['file_name']}")
         print(f"Rows: {metadata['row_count']}")
         print(f"Columns: {metadata['column_count']}")
+
+        return dataset_id
 
     except Exception as exc:
         print(f"\nDataset loading failed: {exc}")
@@ -101,7 +103,7 @@ def run_custom_agent(agent):
             print(f"\nAgent error: {exc}")
 
 
-def run_langgraph_agent(graph):
+def run_langgraph_agent(graph, dataset_id: str | None = None):
     """Run an interactive LangGraph session."""
 
     print("\nLangGraph Agent is ready.")
@@ -129,7 +131,8 @@ def run_langgraph_agent(graph):
                 {
                     "messages": [
                         HumanMessage(content=user_input)
-                    ]
+                    ],
+                    "dataset_id": dataset_id
                 },
                 config=config,
             )
@@ -164,7 +167,7 @@ def main():
     dataset_registry = DatasetRegistry()
 
     # 3. Optionally load a dataset
-    initialize_dataset(dataset_registry)
+    dataset_id = initialize_dataset(dataset_registry)
 
     # 4. Initialize the selected agent
     if agent_type == "custom":
@@ -173,7 +176,7 @@ def main():
 
     else:
         graph = initialize_langgraph_agent(dataset_registry)
-        run_langgraph_agent(graph)
+        run_langgraph_agent(graph, dataset_id=dataset_id)
 
     print("\nAgent session ended.")
 

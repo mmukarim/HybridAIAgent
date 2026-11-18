@@ -3,9 +3,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File as FileUpload, HTTPException, UploadFile, status
 
-from app.api.dependencies import get_file_service
-from app.api.schemas.files import FileListResponse, FileResponse
+from app.api.dependencies import get_file_service, get_dataset_service
+from app.api.schemas.files import FileListResponse, FileResponse, DatasetLoadResponse
 from app.services.file_service import FileService
+from app.services.dataset_service import DatasetService
 
 
 file_router = APIRouter(
@@ -87,3 +88,27 @@ async def delete_file(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found.",
         )
+
+
+@file_router.post(
+    "/{file_id}/load",
+    response_model=DatasetLoadResponse,
+)
+async def load_dataset(
+    file_id: uuid.UUID,
+    dataset_service: Annotated[
+        DatasetService, Depends(get_dataset_service)
+    ],
+):
+    try:
+        return await dataset_service.load_dataset(file_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
