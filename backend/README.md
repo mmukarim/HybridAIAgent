@@ -274,13 +274,17 @@ At minimum, configure:
 - LLM provider credentials and settings.
 - File storage directory.
 - Maximum upload size.
+- Allowed browser origins for CORS.
 
-Example file-storage configuration:
+Example file-storage and CORS configuration:
 
 ```env
 FILE_STORAGE_PATH=storage/uploads
 MAX_UPLOAD_SIZE_MB=50
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
+
+`CORS_ALLOWED_ORIGINS` is a comma-separated list of complete origins, including scheme and port. The defaults allow the Vite development server on `localhost` and `127.0.0.1`; set this value to the exact frontend origin or origins for other environments.
 
 Do not commit API keys, passwords, or other secrets to version control.
 

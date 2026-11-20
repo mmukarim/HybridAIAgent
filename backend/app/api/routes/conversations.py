@@ -145,4 +145,4 @@ async def remove_conversation_dataset(
             detail="Conversation not found.",
         )
 
-    return {"message": "Dataset association removed successfully."}
+    return conversation

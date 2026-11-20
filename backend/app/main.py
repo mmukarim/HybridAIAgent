@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.routes import conversation_router, message_router, file_router
@@ -60,6 +61,14 @@ agent_app = FastAPI(
     description="API for the Hybrid AI Data Analyst Agent",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+agent_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Accept", "Content-Type"],
 )
 
 
